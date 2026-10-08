@@ -1,0 +1,11 @@
+{
+  "name": "achilles-rehab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Achilles Rebuild — staged tendon-loading protocol PWA, post-fluoroquinolone, back to Muay Thai",
+  "scripts": {
+    "test": "node --test --test-force-exit",
+    "serve": "python -m http.server 8124"
+  }
+}
