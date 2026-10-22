@@ -24,48 +24,59 @@ test('every day for a year builds, and every item is a known exercise with a dos
   }
 });
 
-test('block layout: strength 1–28, heavy 29–70, spring 71–98, Muay Thai from 99', () => {
-  assert.deepEqual(BLOCK_STARTS, [1, 29, 71, 99]);
-  assert.equal(MUAY_THAI_DAY, 99);
-  assert.equal(buildDay(1).block, 'Strength');
-  assert.equal(buildDay(29).block, 'Heavy and slow');
-  assert.equal(buildDay(71).block, 'Spring');
-  assert.equal(buildDay(99).block, 'Muay Thai');
+test('block layout: heavy 1–42, spring 43–70, Muay Thai from 71 if every week is used', () => {
+  assert.deepEqual(BLOCK_STARTS, [1, 43, 71]);
+  assert.equal(MUAY_THAI_DAY, 71);
+  assert.equal(buildDay(1).block, 'Heavy and slow');
+  assert.equal(buildDay(43).block, 'Spring');
+  assert.equal(buildDay(71).block, 'Muay Thai');
 });
 
-test('day 1 starts with the baseline heel-raise test', () => {
-  assert.equal(buildDay(1).items[0].ex, 'test_raise');
-  assert.notEqual(buildDay(3).items[0].ex, 'test_raise');
+test('heavy block: heel-raise test on day 5 of every week, gate on every week end', () => {
+  for (let w = 0; w < 6; w++) {
+    assert.equal(buildDay(5 + 7 * w).items[0].ex, 'test_raise', `week ${w + 1}`);
+    assert.ok(buildDay(7 + 7 * w).gate, `week ${w + 1} gate`);
+  }
+  assert.notEqual(buildDay(1).items[0].ex, 'test_raise');
+  assert.equal(buildDay(7).skipTo, 43);
+  assert.equal(buildDay(7).repeatFrom, null);
+  assert.equal(buildDay(42).skipTo, null);
+  assert.equal(buildDay(42).repeatFrom, 36);
+  assert.equal(buildDay(6).gate, null);
 });
 
-test('each block has its gate test in the last week and a gate on its last day', () => {
-  assert.equal(buildDay(26).items[0].ex, 'test_raise');
-  assert.ok(buildDay(28).gate);
-  assert.equal(buildDay(28).repeatFrom, 22);
-  assert.equal(buildDay(68).items[0].ex, 'test_raise');
+test('spring block: hop test in the last week only, gate on its last day', () => {
+  assert.equal(buildDay(67).items[0].ex, 'test_hop');
+  assert.notEqual(buildDay(46).items[0].ex, 'test_hop');
+  assert.equal(buildDay(49).gate, null);
   assert.equal(buildDay(70).repeatFrom, 64);
-  assert.equal(buildDay(95).items[0].ex, 'test_hop');
-  assert.equal(buildDay(98).repeatFrom, 92);
-  assert.equal(buildDay(27).gate, null);
+});
+
+test('earliest Muay Thai counts to the next test, then the spring block', () => {
+  assert.equal(buildDay(1).toMuayThai, 7 + 28);
+  assert.equal(buildDay(8).toMuayThai, 7 + 28);
+  assert.equal(buildDay(43).toMuayThai, 28);
+  assert.equal(buildDay(70).toMuayThai, 1);
+  assert.equal(buildDay(71).toMuayThai, 0);
 });
 
 test('no plyo on consecutive days in the spring block', () => {
-  for (let n = 71; n < 98; n++) {
+  for (let n = 43; n < 70; n++) {
     assert.ok(!(buildDay(n).key === 'P' && buildDay(n + 1).key === 'P'), `plyo on ${n} and ${n + 1}`);
   }
 });
 
 test('Muay Thai ramps 1 → 2 → 3 classes a week', () => {
   const count = (start) => [...Array(7)].filter((_, i) => buildDay(start + i).key === 'M').length;
-  assert.equal(count(99), 1);
-  assert.equal(count(99 + 21), 2);
-  assert.equal(count(99 + 42), 3);
-  assert.equal(count(99 + 200), 3);
+  assert.equal(count(71), 1);
+  assert.equal(count(71 + 21), 2);
+  assert.equal(count(71 + 42), 3);
+  assert.equal(count(71 + 200), 3);
 });
 
 test('stairs walk grows 10 → 30 min and stops at 30', () => {
   const mins = [];
-  for (let n = 29; n <= 70; n++) {
+  for (let n = 1; n <= 42; n++) {
     const s = buildDay(n).items.find((i) => i.ex === 'stairs');
     if (s) mins.push(s.amount);
   }
@@ -132,27 +143,37 @@ test('a rest day moves on by itself the next day, no question', () => {
   assert.equal(s.day, 8);
 });
 
-test('gate: failing the test repeats the last week, passing moves to the next block', () => {
-  const run = (L, R) => {
-    const s = newState(D1);
-    s.day = 28;
-    saveTest(s, D1, 'test_raise', L, R);
-    finishDay(s, D1);
-    rollover(s, D2);
-    return s;
-  };
-  assert.equal(run(25, 22).day, 29);
-  const low = run(25, 18);
-  assert.equal(low.day, 22);
-  assert.match(low.message, /20 on each leg/);
-  const lopsided = run(30, 22); // 27% gap
-  assert.equal(lopsided.day, 22);
+const runGate = (day, L, R) => {
+  const s = newState(D1);
+  s.day = day;
+  saveTest(s, D1, 'test_raise', L, R);
+  finishDay(s, D1);
+  rollover(s, D2);
+  return s;
+};
+
+test('weekly heavy test: pass skips to the jump block, miss carries on to next week', () => {
+  const pass = runGate(7, 27, 25);
+  assert.equal(pass.day, 43);
+  assert.match(pass.message, /jump training/);
+  const today20 = runGate(7, 20, 20); // where he is now
+  assert.equal(today20.day, 8);
+  assert.match(today20.message, /25 on each leg.*next week/);
+  const lopsided = runGate(14, 34, 26); // 24% gap
+  assert.equal(lopsided.day, 15);
   assert.match(lopsided.message, /within 20%/);
+});
+
+test('last heavy week: a miss repeats the last week, a pass moves on', () => {
+  assert.equal(runGate(42, 25, 25).day, 43);
+  const low = runGate(42, 25, 18);
+  assert.equal(low.day, 36);
+  assert.match(low.message, /Repeating the last week/);
 });
 
 test('gate uses the LATEST test, and no test means not passed', () => {
   const s = newState(D1);
-  const gate = buildDay(28).gate;
+  const gate = buildDay(42).gate;
   assert.equal(gatePasses(s, gate).ok, false);
   saveTest(s, D1, 'test_raise', 25, 25);
   assert.equal(gatePasses(s, gate).ok, true);

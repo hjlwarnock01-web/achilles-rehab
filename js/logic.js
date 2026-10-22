@@ -4,6 +4,7 @@
 // Next calendar day: if yesterday was training, one tap "Fine" or "Sore".
 //   Fine → next day.  Sore → easy day today, then repeat the same day.
 // Block ends check the test: not passed → repeat the block's last week.
+// Heavy block tests weekly: passed → skip to the next block early.
 import { buildDay } from './program.js';
 
 export function dateKey(d = new Date()) {
@@ -60,6 +61,18 @@ function advance(state) {
   const d = buildDay(state.day);
   if (d.gate) {
     const g = gatePasses(state, d.gate);
+    if (d.skipTo) {
+      // Weekly test inside a block: pass → skip ahead, miss → carry on.
+      state.ticks = {};
+      if (g.ok) {
+        state.day = d.skipTo;
+        state.message = 'Test passed. Skipping ahead to the jump training.';
+      } else {
+        state.day += 1;
+        state.message = `${g.why} Keep going, test again next week.`;
+      }
+      return state;
+    }
     if (!g.ok) {
       state.day = d.repeatFrom;
       state.message = `Not quite ready for the next stage. ${g.why} Repeating the last week.`;

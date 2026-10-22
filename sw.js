@@ -1,7 +1,7 @@
 // App-shell service worker: precache the shell, cache-first for same-origin.
 // Bump CACHE and the ?v= in index.html together on every release.
 
-const CACHE = 'achilles-rehab-v2';
+const CACHE = 'achilles-rehab-v3';
 
 const SHELL = [
   './',

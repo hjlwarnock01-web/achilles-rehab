@@ -1,4 +1,4 @@
-import { EX, buildDay, doseText, WARNING_SIGNS, LEVO_NOTES, MUAY_THAI_DAY } from './program.js';
+import { EX, buildDay, doseText, WARNING_SIGNS, LEVO_NOTES } from './program.js';
 import {
   dateKey, rollover, answerFeel, isEasyToday, itemsToday, ticksToday, dayDone,
   tick, saveTest, setDay, latestTest,
@@ -41,7 +41,10 @@ function render() {
   } else {
     const stage = d.weeks ? `${d.block} · week ${d.week} of ${d.weeks}` : `${d.block} · week ${d.week}`;
     html += `<div class="eyebrow">${esc(stage)}</div><h1>Day ${d.n}</h1>`;
-    if (d.n < MUAY_THAI_DAY) html += `<p class="sub">Muay Thai from day ${MUAY_THAI_DAY} at the earliest</p>`;
+    if (d.toMuayThai > 0) {
+      const w = Math.ceil(d.toMuayThai / 7);
+      html += `<p class="sub">Muay Thai in ${w} week${w === 1 ? '' : 's'} if you pass your tests</p>`;
+    }
   }
   html += '</header>';
 
@@ -263,7 +266,7 @@ function openMore() {
 
   const tests = state.tests.slice().reverse();
   html += '<h3>Your test results</h3>';
-  if (!tests.length) html += '<p class="sub">None yet. The first one is on day 1.</p>';
+  if (!tests.length) html += '<p class="sub">None yet. The first one is on day 5.</p>';
   else {
     html += '<table><tr><th>Day</th><th>Test</th><th>Right</th><th>Left</th></tr>';
     for (const r of tests) {

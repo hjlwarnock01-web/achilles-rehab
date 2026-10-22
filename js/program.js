@@ -1,9 +1,10 @@
 // The whole programme as a list of days. No equipment: a stair, a backpack
 // with water bottles, the floor. Pure data + a day builder, no DOM.
 //
-// Slower than a standard Achilles plan on purpose: a levofloxacin-injured
-// tendon stays fragile for 6–12 months, so tempo stays slow and jumping
-// waits until the strength tests pass.
+// Starts at heavy, slow loading: he already does ~20 one-leg heel raises, so
+// the basic strength block is skipped. The heel-raise test runs every week;
+// pass it (25 each leg, within 20%) and he moves straight to jumping. Jumping
+// still ramps up because a levofloxacin tendon stays fragile for 6–12 months.
 
 export const EX = {
   hold: {
@@ -18,25 +19,9 @@ export const EX = {
     name: 'One-leg balance, eyes closed',
     how: 'Stand on one foot, soft knee, eyes closed. Touch the wall if you wobble, then let go again.',
   },
-  dl_raise: {
-    name: 'Calf raises, both legs',
-    how: 'Balls of both feet on a stair, heels hanging off. Rise all the way up over 3 seconds, lower over 3 seconds until the heels are just below the stair. Even weight on both feet.',
-  },
-  sl_raise_floor: {
-    name: 'One-leg calf raises, floor',
-    how: 'One foot on the floor, fingertips on a wall for balance only. Rise all the way up over 3 seconds, lower over 3. Right leg first. Can\'t get all the reps? Push up with both feet, lower on one.',
-  },
-  sl_raise_step: {
-    name: 'One-leg calf raises, stair',
-    how: 'Ball of one foot on a stair, heel hanging off. Up over 3 seconds, down over 3 until the heel is just below the stair. No bouncing at the bottom. Right leg first.',
-  },
   sl_raise_bag: {
     name: 'One-leg calf raises, backpack',
     how: 'Same as the stair raise, wearing a backpack with water bottles in it. Up 3 seconds, hold 2, down 3. The last 2 reps should be hard but clean. Add one bottle a week if the mornings stay fine. Right leg first.',
-  },
-  bent_raise: {
-    name: 'Bent-knee calf raises',
-    how: 'One foot on a stair, knee bent a little and kept bent the whole time. Rise and lower slowly. This works the deep calf muscle you use on stairs. Right leg first.',
   },
   bent_raise_bag: {
     name: 'Bent-knee calf raises, backpack',
@@ -45,10 +30,6 @@ export const EX = {
   tib: {
     name: 'Toe raises against a wall',
     how: 'Back against a wall, feet a step out in front. Lift both sets of toes as high as you can, lower slowly. A burn in the shins is normal.',
-  },
-  step_up: {
-    name: 'Step-ups',
-    how: 'Step up onto a stair, push through the whole foot. Lower yourself back down slowly, over 3 seconds.',
   },
   step_down: {
     name: 'Slow step-downs',
@@ -119,29 +100,9 @@ const it = (ex, sets, amount, unit = 'reps', extra = {}) => ({ ex, sets, amount,
 
 const BLOCKS = [
   {
-    name: 'Strength',
-    weeks: 4,
-    pattern: ['S', 'W', 'S', 'W', 'S', 'W', 'R'],
-    gate: { test: 'test_raise', min: 20, sym: 20, at: 4 },
-    days: {
-      S: (w) => [
-        it('hold', 2, 30, 's'),
-        it('dl_raise', 3, 15),
-        w <= 2 ? it('sl_raise_floor', 3, 8, 'reps', { each: true }) : it('sl_raise_step', 3, 10, 'reps', { each: true }),
-        it('bent_raise', 3, 12, 'reps', { each: true }),
-        it('tib', 2, 15),
-        it('step_up', 2, 10, 'reps', { each: true }),
-      ],
-      W: () => [
-        it('balance', 3, 30, 's', { each: true }),
-        it('step_down', 2, 8, 'reps', { each: true }),
-        it('walk', 1, 20, 'min'),
-      ],
-    },
-  },
-  {
     name: 'Heavy and slow',
     weeks: 6,
+    weeklyTest: true, // test every week; a pass skips the rest of the block
     pattern: ['H', 'W', 'H', 'W', 'H', 'U', 'R'],
     gate: { test: 'test_raise', min: 25, sym: 20, at: 4 },
     days: {
@@ -238,7 +199,7 @@ export const BLOCK_STARTS = (() => {
 
 export const MUAY_THAI_DAY = BLOCK_STARTS[BLOCK_STARTS.length - 1];
 
-// Build day n (1-based). Returns { n, block, week, weeks, items, rest, gate, repeatFrom }.
+// Build day n (1-based). Returns { n, block, week, weeks, items, rest, gate, skipTo, repeatFrom, toMuayThai }.
 export function buildDay(n) {
   n = Math.max(1, Math.floor(n));
   let start = 1;
@@ -249,17 +210,24 @@ export function buildDay(n) {
       const week = Math.floor(idx / 7) + 1;
       const key = b.pattern[idx % 7];
       const lastWeek = week === b.weeks;
+      const testWeek = lastWeek || b.weeklyTest;
       let items = key === 'R' ? [] : b.days[key](week);
-      // Baseline test on day 1, gate test in the block's last week.
-      if (n === 1) items = [it('test_raise', 1, 1, 'test'), ...items];
-      if (lastWeek && idx % 7 === b.gate.at) items = [it(b.gate.test, 1, 1, 'test'), ...items];
+      if (testWeek && idx % 7 === b.gate.at) items = [it(b.gate.test, 1, 1, 'test'), ...items];
       const isBlockEnd = idx === len - 1;
+      const isWeekEnd = idx % 7 === 6;
+      const checkGate = isBlockEnd || (b.weeklyTest && isWeekEnd);
+      // Earliest Muay Thai: pass the next test, then every later block in full.
+      const testEnd = b.weeklyTest ? start + week * 7 - 1 : start + len - 1;
+      let toMuayThai = testEnd - n + 1;
+      for (const later of BLOCKS.slice(BLOCKS.indexOf(b) + 1)) toMuayThai += later.weeks * 7;
       return {
         n, block: b.name, week, weeks: b.weeks, key,
         rest: key === 'R',
         items: key === 'R' ? [it('rest', 1, 1, 'rest')] : items,
-        gate: isBlockEnd ? b.gate : null,
+        gate: checkGate ? b.gate : null,
+        skipTo: checkGate && !isBlockEnd ? start + len : null,
         repeatFrom: isBlockEnd ? start + (b.weeks - 1) * 7 : null,
+        toMuayThai,
       };
     }
     start += len;
@@ -274,7 +242,9 @@ export function buildDay(n) {
     rest: key === 'R',
     items: key === 'R' ? [it('rest', 1, 1, 'rest')] : MT_DAYS[key](classes),
     gate: null,
+    skipTo: null,
     repeatFrom: null,
+    toMuayThai: 0,
   };
 }
 
