@@ -3,7 +3,7 @@ import {
   dateKey, rollover, answerFeel, isEasyToday, itemsToday, ticksToday, dayDone,
   tick, saveTest, setDay, latestTest,
 } from './logic.js';
-import { load, save, reset } from './store.js';
+import { load, save, reset, loadRemote } from './store.js';
 
 let state = load();
 const app = document.getElementById('app');
@@ -288,6 +288,7 @@ function openMore() {
 // ---------- Boot ----------
 
 refresh();
+loadRemote(state).then((r) => { if (r) { state = r; refresh(); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 setInterval(() => { if (!timer) refresh(); }, 60 * 1000);
 
